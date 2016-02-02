@@ -120,7 +120,7 @@ else
     ESCAL="sudo"
 fi
 
-for X in $(${SSH_PRIM} mount -t ext2,ext3,ext4,ffs| cut -d \  -f 3| grep -v \^/tmp\$ |sort |cut -c 2-); do
+for X in $(${SSH_PRIM} mount -t ext2,ext3,ext4,ffs,xfs,btrfs| cut -d \  -f 3| grep -v \^/tmp\$ |sort |cut -c 2-); do
     if [ ${X} ]; then
 	Y=$(echo ${X} |perl -n -p -e 's|/|-|g')
 	if [ -z "$GPG_PRIM" ]; then
