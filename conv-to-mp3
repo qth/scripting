@@ -1,0 +1,11 @@
+#!/bin/bash
+
+for X in <place>; do
+    if [ -d "${X}" ]; then
+	echo ${X##../} && mkdir "${X##../}"
+	for Y in "${X}"/*flac ; do
+	    Z=${Y##*/}
+	    ffmpeg -i "${Y}" -ab 320k -map_metadata 0 -id3v2_version 3 "${X##../}/${Z%%.flac}.mp3"
+	done
+    fi
+done

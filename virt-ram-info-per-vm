@@ -1,0 +1,10 @@
+#!/bin/bash
+
+let TOTAL=0
+
+for X in $(virsh list --name --all|sort); do
+	TMPVAR=$(grep currentMemory /etc/libvirt/qemu/${X}.xml| sed 's|\(^.*>\)\([0-9]\)|\2|' |sed 's|<.*||')
+	printf "${X},$(($TMPVAR/1024/1024))\n"
+	let TOTAL=TOTAL+TMPVAR
+done
+printf "Total VM RAM allocated: $(( $TOTAL/1024/1024 )) GiB\n"

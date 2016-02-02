@@ -1,0 +1,126 @@
+#!/bin/sh
+
+# copied from wicked cool shell scripts
+# jwb minor mods...
+
+let fail=0
+let tooquick=0
+let warnings=0
+
+onexit(){
+    for Z in $( jobs -p ); do
+	kill $Z
+    done
+    /bin/rm -f $Zout $gzout $bz2out $xzout $lrzout
+}
+
+checkzero() {
+    if [ -s "$1" ]; then
+	return 0
+    else
+	onexit
+	exit 1
+    fi
+}
+
+Z="compress"
+gz="gzip -9"
+bz2="bzip2 -9"
+xz="xz -9"
+lrz="lrzip -q -L9 -w 82"
+
+Zout="/raid1/tmp/bestcompress.$$.Z"
+gzout="/raid1/tmp/bestcompress.$$.gz"
+bz2out="/raid1/tmp/bestcompress.$$.bz2"
+xzout="/raid1/tmp/bestcompress.$$.xz"
+lrzout="/raid1/tmp/bestcompress.$$.lrz"
+skipcompressed=1
+
+if [ "$1" = "-a" ]; then
+    skipcompressed=0 ; shift
+fi
+
+if [ $# -eq 0 ]; then
+    echo "Usage: $0 [-a] file or files to optimally compress" >&2; exit 1
+fi
+
+trap onexit EXIT
+
+for name
+do
+  if [ ! -f "$name" ]; then
+      echo "$0: file $name not found.  Skipped." >&2
+      continue
+  fi
+
+  if [ "$(echo $name | egrep '(\.Z$|\.gz$|\.bz2$|\.xz$|\.lrz$|\.tgz$|\.tbz$|\.txz$)')" != "" ]; then
+      if [ $skipcompressed -eq 1 ]; then
+	  echo "Skipped file ${name}: it's already compressed."
+	  continue
+      else
+	  echo "Warning: Trying to double-compress $name"
+      fi
+  fi
+
+  $Z < "$name" > $Zout &
+  $gz < "$name" > $gzout &
+  $bz2 < "$name" > $bz2out &
+  $xz < "$name" > $xzout &
+  $lrz < "$name" > $lrzout &
+
+  jobs -l
+  for compys in $( jobs -p ); do
+      wait ${compys}
+      result=$?
+      if [ $result -ne 0 ]; then
+	  if [ $result -eq 127 ]; then
+	      let tooquick+=1
+	  elif [ $result -eq 2 ]; then
+	      let warnings+=1
+	  else
+	      printf "PID: $compys, FAIL: $result\n"
+	      # for X in $Zout $gzout $bz2out $xzout $lrzout ; do
+	      # 	  printf "${X}\n"
+	      # done
+	      let fail+=1
+	  fi
+      fi
+  done
+
+  # wait
+
+  if [ $fail -ne 0 ]; then
+      printf "A compression thread failed, exiting\n"
+      onexit
+      exit 1
+  fi
+
+  ls -fl "$name" $Zout $gzout $bz2out $xzout $lrzout | awk '{print NR" "$0}'
+  smallest="$(ls -fl "$name" $Zout $gzout $bz2out $xzout $lrzout | awk '{print $5"="NR}' | sort -n | cut -d= -f2 | head -1)"
+
+  for X in $Zout $gzout $bz2out $xzout $lrzout ; do
+      checkzero ${X}
+  done
+
+  case "$smallest" in
+      1 ) echo "No compression achieved by compressing $name. No change made."
+	  ;;
+      2 ) echo Best compression is with compress. File renamed ${name}.Z
+	  mv $Zout "${name}.Z" && rm -f "$name"
+	  ;;
+      3 ) echo Best compression is with gzip. File renamed ${name}.gz
+	  mv $gzout "${name}.gz" && rm -f "$name"
+	  ;;
+      4 ) echo Best compression is with bzip2. File renamed ${name}.bz2
+	  mv $bz2out "${name}.bz2" && rm -f "$name"
+	  ;;
+      5 ) echo Best compression is with xz. Renaming file to ${name}.xz
+	  mv $xzout "${name}.xz" && rm -f "$name"
+	  ;;
+      6 ) echo Best compression is with lrz. Renaming file to ${name}.lrz
+      	  mv $lrzout "${name}.lrz" && rm -f "$name"
+      	  ;;
+  esac
+done
+
+exit 0

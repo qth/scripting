@@ -1,0 +1,32 @@
+#!/bin/bash
+
+obit() {
+    printf "$1, exiting\n"
+    exit 1
+}
+
+cd /var/lib/libvirt/images || obit "couldn't CWD to /var/lib/libvirt/images"
+IFS=$'\n'
+
+QI=$(which qemu-img 2> /dev/null)
+[ -z $QI ] && obit "qemu-img not found"
+
+Y=$( ls *.raw *.img *.qcow *.qcow2 *.qed *.cow *.vdi *.vmdk \
+    *.cloop *.dmg *.bochs *.vpc *.vvfat *.parallels *.nbd 2> /dev/null)
+[ ! "$Y" ] && obit "no VM disk image files found"
+
+TFILE=/tmp/$(dd if=/dev/urandom bs=1 count=256 2> /dev/null |tr -c -d 'a-zA-Z0-9' |cut -c-7).$$
+touch $TFILE
+[ $? -ne 0 ] && obit "couldn\'t create temp file"
+
+for X in $Y ; do
+    $QI info "${X}" >> $TFILE
+    printf "\n" >> $TFILE
+done
+
+if [ -f $TFILE ]; then
+    printf "Image Name,Image Type,Max size,Current Size,Chunk Size\n"
+    sed 's|^.*: ||;:a;N;s|^\(.*\)\n.*: \(.\+\)|\1,\2|;t a;s|\.[a-zA-Z0-9]\{3,9\},|,|;s| (.*)||;s|\n||g;s|\([0-9]\)G|\1|g' < $TFILE
+    rm -f $TFILE
+fi
+cd - 2>&1 >/dev/null

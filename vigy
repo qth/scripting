@@ -1,0 +1,55 @@
+#!/usr/bin/perl
+
+use Crypt::Vigenere;
+
+sub usage {
+    $0 =~ /([^\/]+)$/;
+    $myname = $&;
+    print "$myname <mode> <key>
+    $& uses <key> to perform a Vigenere transform on STDIN, one line at a time
+    (non alphabetic key characters are ignored, key must contain alphabetic chars)
+    <mode> selects encryption or decryption (must be 'e' or 'd')\n";
+    exit 1
+}
+
+if ( !defined $ARGV[1] ) {
+    usage();
+}
+my $key, $vigy, @chars;
+open (STDI, "<-") or die "Can't open STDIN for some fool reason: $!";
+open (STDO, ">-") or die "Can't open STDOUT for some fool reason: $!";
+
+( $ARGV[0] =~ /^[ed]$/ ) or usage();
+
+@chars = split //, $ARGV[1];
+foreach my $ch (@chars) {
+    if ($ch =~ /^([a-zA-Z])$/) {
+	$ch =~ tr/A-Z/a-z/;
+	$key .= $ch;
+    } 
+}
+
+( $key ) or usage();
+	
+#$ARGV[0] =~ /^([a-zA-Z]+)$/;
+#$key = $1;
+
+@chars = (); chomp $key;
+$vigy = Crypt::Vigenere->new($key);
+#print "#$key#\n";
+
+while (<STDI>) {
+    chomp $_;
+    @chars = split //, $_;
+    foreach my $eh (@chars) {
+	if ( $eh =~ /[a-zA-Z]/ ) {
+	    ( $ARGV[0] eq 'e' ) && print $vigy->encodeMessage( $eh );
+	    ( $ARGV[0] eq 'd' ) && print $vigy->decodeMessage( $eh );
+	    #( $ARGV[0] eq 'd' ) && print '*';
+	} else {
+	    print $eh;
+	}
+    }
+    print "\n";    
+    @chars = ();
+}

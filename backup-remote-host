@@ -1,0 +1,139 @@
+#!/bin/bash
+
+# THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, 
+# INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+# AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL 
+# THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+# INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, 
+# BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
+# USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON 
+# ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+# THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+# James Boyle # 2006-07-31 # backup script
+# James Boyle # 2006-08-02 # Automatically check for the remote host's paritions
+# jwb 2014-01-17 ... updated, can now choose between encrypted / unencrypted
+
+PATH=/sbin:/usr/sbin:/usr/local/sbin:${PATH}
+usage() {
+    echo "Usage: "
+    echo "   $0 <hostname> <full|daily> [gpg]"
+    echo "   (This script dumps to /raid1/backup/dump/<hostname>) "
+    echo "   full performs a level 0 dump of the remote filesystems"
+    echo "   daily performs an 'n' level dump based on a modified"
+    echo "    towers of Hanoi algorithm"
+    echo "   gpg causes the backup file to be encrypted"
+    echo ""
+    echo "   Each host requires an ssh keypair - .ssh/id_dump_<hostname>"
+    echo "   Sudo permissions on the remote host are required"
+    echo "   Requiretty must be unset for the specific sudone (sp?) "
+    echo "   commands"
+    echo "   "
+    echo "   Optional gpg encryption requires a passphrase to be stored in"
+    echo "    ~/.ssh/dump_key_<hostname>"
+    echo "   This is inherently risky for obvious reasons"
+    exit 2
+}
+
+obit() {
+    printf "$1exiting\n"
+    exit 1
+}
+
+killed() {
+    printf "\n trapped a CTRL-C or kill 15\n"
+    [ -d "${TDIR}" ] && printf "\n woulda deleted ${TDIR}\n"
+#    [ -d "${TDIR}" ] && rm -rf "${TDIR}"
+}
+
+hash ssh gpg dump lrzip || obit "$0: required binaries not present"
+PACKER="lrzip -q -L9"
+EXT=".lrz"
+TODAY=$(date +%Y%m%d)
+SSH_PRIM="ssh -c aes256-ctr -i ${HOME}/.ssh/id_dump_${1} ${1}"
+unset GPG_PRIM
+unset ESCAL
+BACKUPDIR=/raid1/backup/dump/${1}
+TDIR=${BACKUPDIR}/${TODAY}
+
+if [ -z "${1}" ]; then
+    usage
+elif [ -z "${2}" ]; then
+    usage
+fi
+
+[ -f ~/.ssh/id_dump_${1} ] || obit "Host ${1} is not configured for backup, "
+[ -z $TODAY ] && obit "Unable to set date, "
+
+if [ "${3}" == "gpg" ]; then
+    [ -f ~/.ssh/dump_key_${1} ] || obit "Host ${1} missing dump key, "
+    GPG_PRIM="gpg --batch --quiet --digest-algo SHA512 --cipher-algo TWOFISH --passphrase-file ${HOME}/.ssh/dump_key_${1} -c"
+    EXT=".lrz.gpg"
+fi
+
+trap killed ERR
+
+if [ "${2}" != "daily" ] && [ "${2}" != "full" ]; then
+    printf "choose full or daily\n\n"
+    usage
+else
+    if [ "${2}" == "full" ]; then
+	lvl='0'
+    fi
+    if [ "${2}" == "daily" ]; then
+	case $(date +%A) in
+            Monday)
+                lvl=3
+                ;;
+            Tuesday)
+                lvl=2
+                ;;
+            Wednesday)
+                lvl=5
+                ;;
+            Thursday)
+                lvl=4
+                ;;
+            Friday)
+                lvl=7
+                ;;
+	    Saturday)
+		lvl=6
+		;;
+	    Sunday)
+		lvl=9
+		;;
+            *)
+                lvl=1
+                ;;
+        esac
+    fi
+fi
+
+mkdir -p ${TDIR} || obit "could not create dumpdir: ${TDIR}\n"
+
+${SSH_PRIM} which doas 2>&1 >/dev/null
+if [ $? -eq 0 ] ; then
+    ESCAL="doas"
+else
+    ESCAL="sudo"
+fi
+
+for X in $(${SSH_PRIM} mount -t ext2,ext3,ext4,ffs| cut -d \  -f 3| grep -v \^/tmp\$ |sort |cut -c 2-); do
+    if [ ${X} ]; then
+	Y=$(echo ${X} |perl -n -p -e 's|/|-|g')
+	if [ -z "$GPG_PRIM" ]; then
+	    ${SSH_PRIM} ${ESCAL} /sbin/dump -${lvl}uan -f - /${X} |${PACKER} |dd of=$TDIR/${1}-${lvl}-dump-${Y}${EXT}
+	else
+	    ${SSH_PRIM} ${ESCAL} /sbin/dump -${lvl}uan -f - /${X} |${PACKER} |${GPG_PRIM} |dd of=$TDIR/${1}-${lvl}-dump-${Y}${EXT}
+	fi
+    fi
+done
+
+# there's always a / partition
+if [ -z "$GPG_PRIM" ]; then 
+    ${SSH_PRIM} ${ESCAL} /sbin/dump -${lvl}uan -f - / |${PACKER} |dd of=$TDIR/${1}-${lvl}-dump-root${EXT}
+else
+    ${SSH_PRIM} ${ESCAL} /sbin/dump -${lvl}uan -f - / |${PACKER} |${GPG_PRIM} |dd of=$TDIR/${1}-${lvl}-dump-root${EXT}
+fi

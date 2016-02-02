@@ -1,0 +1,10 @@
+#!/bin/bash
+
+usage() {
+    printf "$0 <length of password>\n"
+    exit 1
+}
+
+[ -z "$1" ] && usage
+
+dd if=/dev/urandom bs=1 count=512 2>/dev/null |tr -d -c '0-9a-zA-Z' |cut -c-$1

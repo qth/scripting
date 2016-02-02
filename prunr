@@ -1,0 +1,32 @@
+#!/bin/bash
+# prune fedora mirrored directories for updates and extras.
+# the mirrors usually keep the last 2 versions of a package
+# but when making a dvd, I only want to keep 1 version of each
+# package (the newest)
+# Run this script in the directory where the packages are.
+# it will make a list of files deleted files on stdout.
+#
+# Originally taken from:
+# 2007-01-12 olenb  http://forums.fedoraforum.org/archive/index.php/t-144081.html
+
+for di in *.rpm ; do
+    DNAME=$(rpm -qp --qf '%{NAME}' $di 2>/dev/null)
+    DARCH=$(rpm -qp --qf '%{ARCH}' $di 2>/dev/null)
+    DTIME=$(rpm -qp --qf '%{BUILDTIME}' $di 2>/dev/null)
+
+    for ui in ${DNAME}-*.rpm ; do
+
+	NAME=$(rpm -qp --qf '%{NAME}' $ui 2>/dev/null)
+	ARCH=$(rpm -qp --qf '%{ARCH}' $ui 2>/dev/null)
+
+	if [[ "$DNAME" == "$NAME" && "$DARCH" == "$ARCH" ]] ; then
+	    UTIME=$(rpm -qp --qf '%{BUILDTIME}' $ui 2>/dev/null )
+
+	    if (( $UTIME > $DTIME )) ; then
+		# echo "$di"
+                rm -vf $di
+		break
+	    fi
+	fi
+    done #loop over possible updates
+done #loop over orginal rpms

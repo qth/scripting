@@ -1,0 +1,18 @@
+#!/bin/bash
+
+declare -i br0=0
+declare -i br1=0
+declare -i br2=0
+
+for X in $(grep bridge= /etc/libvirt/qemu/*xml |sed "s|^.*<source bridge='||;s|'/>.*$||"); do
+    case "${X}" in 
+	br0 ) br0+=1
+	    ;;
+	br1 ) br1+=1
+	    ;;
+	br2 ) br2+=1
+	    ;;
+    esac
+done
+
+printf "br0 = $br0, \tbr1 = $br1, \tbr2 = $br2\n"
