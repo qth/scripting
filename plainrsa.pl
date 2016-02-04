@@ -2,6 +2,7 @@
 #!/usr/bin/perl -w
 # Convert public keys from and to the format used by Racoon.
 # Written and placed in the public domain by Andreas Voegele.
+# Works to convert between Brocade vRouter / Vyatta and OpenBSD
 
 use strict;
 
