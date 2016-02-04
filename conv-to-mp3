@@ -1,4 +1,5 @@
 #!/bin/bash
+# basic skeleton for converting flac to mp3 with metadata / tags
 
 for X in <place>; do
     if [ -d "${X}" ]; then
