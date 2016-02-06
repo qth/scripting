@@ -1,4 +1,5 @@
 #!/bin/bash
+# requires ffmpeg (&ffprobe from ffmpeg package)
 
 extension=${1##*.}
 fname=${1%.*}
