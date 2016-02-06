@@ -1,15 +1,25 @@
 #!/bin/bash
 # requires ffmpeg (&ffprobe from ffmpeg package)
 
+die () {
+    echo "Error: $@, exiting"
+    exit 1
+}
+
+[ -z $1 ] && die please specify a video file to extract audio from
+
 extension=${1##*.}
 fname=${1%.*}
 
 echo $extension | egrep mkv\|m4v\|mp4\|webm\|flv\|avi\|flash\|swf &> /dev/null
 
 if [ $? -ne 0 ]; then
-    echo $1 is not a supported file type
+    die $1 is not a supported file type
     exit 1
 fi
+
+$(ffprobe -L >/dev/null 2>&1) || die "ffmpeg not installed"
+$(ffmpeg -L >/dev/null 2>&1) || die "ffmpeg not installed"
 
 codec=$(ffprobe "${1}" 2>&1 |grep -i Audio |grep 'Stream.*0:' |head -1 |sed 's|.*Audio: ||' | sed 's|,.*||')
 
