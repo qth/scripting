@@ -1,0 +1,37 @@
+#!/bin/bash
+
+extension=${1##*.}
+fname=${1%.*}
+
+echo $extension | egrep mkv\|m4v\|mp4\|webm\|flv\|avi\|flash\|swf &> /dev/null
+
+if [ $? -ne 0 ]; then
+    echo $1 is not a supported file type
+    exit 1
+fi
+
+codec=$(ffprobe "${1}" 2>&1 |grep -i Audio |grep 'Stream.*0:' |head -1 |sed 's|.*Audio: ||' | sed 's|,.*||')
+
+case $codec in
+    vorbis)
+	outext=ogg
+	;;
+    aac*)
+	outext=aac
+	;;
+    mp3*)
+	outext=mp3
+	;;
+    *)
+	echo codec not supported, exiting!
+	echo \(${codec}\)
+	exit 1
+	;;
+esac
+
+ofile=$fname.$outext
+
+echo $codec detected.
+echo output filename will be $fname.$outext
+
+ffmpeg -i "${1}" -vn -acodec copy "${ofile}"
