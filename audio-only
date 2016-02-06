@@ -34,8 +34,7 @@ case $codec in
 	outext=mp3
 	;;
     *)
-	echo codec not supported, exiting!
-	echo \(${codec}\)
+	die "codec \(${codec}\) not supported, exiting!"
 	exit 1
 	;;
 esac
