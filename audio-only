@@ -35,7 +35,6 @@ case $codec in
 	;;
     *)
 	die "codec \(${codec}\) not supported, exiting!"
-	exit 1
 	;;
 esac
 
