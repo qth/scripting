@@ -1,0 +1,32 @@
+#!/bin/bash
+
+obit () {
+    echo -n error: $@
+    exit 1
+}
+
+usage () {
+    printf "${0}: A utility to retrieve FogBugz tickets as PDFs\n"
+    printf "      usage:\n"
+    printf "       ${0} <cookiefile> <ticket #>\n"
+    printf "       <cookiefile> - cookies, one per line, as [name] [value]\n"
+    printf "       <ticket #> - the FogBugz ticket number\n"
+    printf "\n"
+    printf "      Assumes a base URL of https://fogbugz.example.com/default.asp?\n"
+    obit "\nSpecify parameters as described above\n"
+}
+
+[ -z ${1} ] && usage
+[ -z ${2} ] && usage
+[ -s ${1} ] || obit "\nCookie file is not valid\n"
+
+hash wkhtmltopdf || obit "\nwkhtmltopdf not installed\n"
+readarray -t cookies < ${1}
+unset cookievar
+optvar="-s Letter -T 0.5in -B 0.5in -L 0.5in -R 0.5in" # 8.5 x 11 inch page, half inch margins
+
+for ((i=0; i<${#cookies[@]}; i+=1)); do
+    cookievar="$cookievar --cookie ${cookies[$i]}"
+done
+
+wkhtmltopdf $optvar $cookievar page https://fogbugz.example.com/default.asp?${2} ${2}.pdf
