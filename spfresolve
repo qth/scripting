@@ -1,0 +1,60 @@
+#!/bin/ksh
+
+# 2014-02-12 James Boyle
+
+usage() {
+    printf "\n$0 <domain name to lookup>\n"
+    printf "   This is a quick and dirty script which returns a list of\n"
+    printf "   IP addresses and netblocks based on SPF records stored as\n"
+    printf "   TXT or SPF RR types in DNS\n\n"
+    printf "   It is most useful when prepopulating OpenBSD spamd for\n"
+    printf "   a low traffic server\n\n"
+    exit 1
+}
+
+[ -z "$1" ] && usage
+
+unset A INCL IPLIST
+TMPFILE=/tmp/$$.$(dd if=/dev/urandom bs=1 count=256 2>/dev/null |tr -d -c '0-9a-zA-Z' |cut -c-7)
+
+update() {
+    IPLIST=${IPLIST}$(echo $1 |sed 's|"||g' |tr '\ ' '\n' |grep ip4: |sed 's|^ip4:||')
+    IPLIST=${IPLIST}" "
+    #printf "IPLIST UPDATE:\n$IPLIST\n"
+    INCL=${INCL}$(echo $1 |sed 's|"||g' |tr '\ ' '\n' |grep include: |sed 's|^include:||')
+    INCL=${INCL}" "
+    INCL=${INCL}$(echo $1 |sed 's|"||g' |tr '\ ' '\n' |grep redirect |sed 's|^redirect=||')
+    INCL=${INCL}" "
+    #printf "INCL UPDATE:\n$INCL\n"
+    A=${A}$(echo $1 |tr '\ ' '\n' |grep a: |sed 's|^a:||')
+    A=${A}" "
+    #printf "A UPDATE:\n$A\n"
+}
+
+update "$(dig $1 txt +short |grep -i spf)"
+update "$(dig $1 spf +short |grep -i spf)"
+
+COUNTER=0
+while [ ! -z "$INCL" ]; do
+    let COUNTER+=1
+    TMPA=${INCL}
+    unset INCL
+    for X in ${TMPA}; do
+        [ "${X}" == "$1" ] && continue
+        update "$(dig ${X} txt +short |grep -i spf)"
+        update "$(dig ${X} spf +short |grep -i spf)"
+    done
+    #this is important to avoid infinite looping... some domain admins have recursive includes o_O
+    [ $COUNTER -ge 10 ] && break
+done
+
+for X in ${A}; do
+    IPLIST=${IPLIST}$(dig ${X} A +short)
+done
+
+for X in ${IPLIST}; do
+    printf "${X}\n" >> $TMPFILE
+done
+
+sort -n $TMPFILE |uniq
+[ -f "$TMPFILE" ] && rm -f $TMPFILE
