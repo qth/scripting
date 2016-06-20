@@ -6,10 +6,10 @@ die () {
     exit 1
 }
 
-[ -z $1 ] && die please specify a video file to extract audio from
+[ -z "$1" ] && die please specify a video file to extract audio from
 
-extension=${1##*.}
-fname=${1%.*}
+extension="${1##*.}"
+fname="${1%.*}"
 
 echo $extension | egrep mkv\|m4v\|mp4\|webm\|flv\|avi\|flash\|swf &> /dev/null
 
@@ -27,6 +27,9 @@ case $codec in
     vorbis)
 	outext=ogg
 	;;
+    opus)
+        outext=ogg
+        ;;
     aac*)
 	outext=aac
 	;;
