@@ -1,0 +1,4 @@
+for X in $(grep -v '#' $1 |sort |uniq); do
+   printf "%-50s" "zone \"${X}\"" >> ./tmp-1
+   printf "{ type master; file \"zones/nxdomain\"; };\n" >> ./tmp-1
+done
