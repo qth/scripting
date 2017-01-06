@@ -1,0 +1,31 @@
+#!/bin/bash
+# This script should do two things:
+#   1. process yesterday's snapshots into video for each day, delete the snaps
+#   2. convert yesterday's AVI motion captures into VP9
+#
+# Assumptions:
+#  This script is run from cron on a daily basis, and,
+#  /etc/motion.conf options are set as follows:
+#   picture_type jpeg
+#   ffmpeg_output_movies on
+#   snapshot_interval 60
+#   target_dir /var/motion
+#   snapshot_filename %Y/%m/%d/%H%M%S-snapshot
+#   picture_filename %Y/%m/%d/%H%M%S-%q
+#   movie_filename %Y/%m/%d/%H%M%S
+
+DATEY=$(date -d yesterday +%Y%m%d)
+DAY=${DATEY:6:2}
+MONTH=${DATEY:4:2}
+YEAR=${DATEY:0:4}
+
+YESTERDAY=/var/motion/$YEAR/$MONTH/$DAY
+
+cd $YESTERDAY || exit 1
+
+(ffmpeg -loglevel fatal -nostats -hide_banner -nostdin -pattern_type glob -i '*-snapshot.jpg' -c:v libvpx-vp9 -crf 10 -b:v 0 -c:a libvorbis -threads 4 ${DATEY}-timelapse-vp9.webm && rm *snapshot.jpg) &
+for X in *.avi; do
+    (ffmpeg -loglevel fatal -nostats -hide_banner -nostdin -i "${X}" -c:v libvpx-vp9 -crf 10 -b:v 0 -c:a libvorbis -threads 4 "${X%%.avi}.webm" && rm -f "${X}") &
+done
+
+chown -R motion:video /var/motion
