@@ -22,7 +22,7 @@ cd $BASENAME || bail "couldn't switch to ${BASENAME}"
 #splitpem.pl ${1%%.pem} && rm ${1%%.pem}
 openssl x509 -in ${BASECN} -out ${BASECN}.pem
 openssl rsa -aes256 -in ${BASECN} -out ${BASECN}.key && rm ${BASECN}
-sed "s|jboyle@quotient-inc.com|${BASECN}|" ../client.conf >> ./client.conf
+sed "s|user@example.com|${BASECN}|" ../client.conf >> ./client.conf
 cp client.conf client.ovpn
 cp ../cacert.pem ./
 cd ..
