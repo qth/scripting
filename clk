@@ -1,5 +1,10 @@
 #!/bin/bash
 
+die () {
+    printf "ERROR: $@\n"
+    exit 1
+}
+
 TZ="$(date +%z)"
 TZ_SIGN=${TZ:0:1}
 TZ_HOUR=${TZ:1:2}
@@ -8,6 +13,7 @@ TZ_MIN=${TZ:3:2}
 FF="$TZ_SIGN $(( $((TZ_HOUR*3600)) + $((TZ_MIN*60)) ))"
 
 SERIAL="/dev/$(dmesg |grep 'FTDI.*attached to ttyUSB' |tail -1 |sed 's|^.*ttyUSB|ttyUSB|')"
+[ -c "${SERIAL}" ] || die "FTDI USB to serial converter not attached"
 
 stty -F "${SERIAL}" raw ispeed 19200 ospeed 19200
 exec 5<>"${SERIAL}"
